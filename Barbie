@@ -129,13 +129,15 @@ def compare_susy(susy_file, out_file, index):
 
 				diference_count += 1
 
+		diference_count += abs(len(s_lines) - len(t_lines))
+
 		msg_f =  "\nDiference count: %d" % diference_count
 		barbie_out.write(msg_f)
 
 		if not diference_count:
 			msg_t = "Teste %d: Resultado correto!" % (index)
 		else:
-			msg_t = "Teste %d: Resultado incorreto. Linhas divergentes: %d" % (index, diference_count + abs(len(s_lines) - len(t_lines)))
+			msg_t = "Teste %d: Resultado incorreto. Linhas divergentes: %d" % (index, diference_count)
 
 		print(msg_t,)
 
