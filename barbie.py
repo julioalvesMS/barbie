@@ -5,8 +5,6 @@ import subprocess
 import os.path
 import getopt
 
-import susy_interface as susy
-
 
 def exe_code(exec_file, in_file, out_dir, index):
 	out = open(os.path.join(out_dir, str(index), in_file.split('.')[0]) + '.out', 'w')
@@ -68,12 +66,19 @@ def compare_susy(susy_file, out_file, index):
 	susy.close()
 	test.close()
 
+
 def _gcc_output_file(source_code):
 	return os.path.splitext(source_code)[0] + '.gcc'
 
 def compile_c(source_code):
+	# Define the gcc output and the compile code files names
 	gcc_out = _gcc_output_file(source_code)
 	exec_file = os.path.splitext(source_code)[0]
+	
+	# Avoid the possibility of having the output with the same name as the input
+	if exec_file == source_code:
+		exec_file += ".out"
+
 	compilation_args = ["gcc", source_code, "-o", exec_file]
 	with open(gcc_out, 'w') as out:
 		process = subprocess.run(compilation_args, stdout=out, stderr=subprocess.STDOUT)
@@ -81,11 +86,29 @@ def compile_c(source_code):
 	return exec_file
 
 
+def get_local_tests(tests_folder):
+	in_files  = []
+	res_files = []
+	# serach for test files in the tests_folder
+	for root, dirs, files in os.walk(tests_folder):
+		# Enter each test directory
+		if root is not tests_folder:
+			for arq in files:
+				# Check the extension
+				ext = os.path.splitext(arq)[1]
+				if ext == '.in': # input file
+					in_files.append(arq)
+				elif ext == '.res': # result file
+					res_files.append(arq)
+	in_files.sort()
+	res_files.sort()
+	return in_files, res_files
+
+
 def usage():
 	print("""
 	Welcome to Barbie!
 	The Susy Simulator
-	Usage:
 	
 	Pré-requisitos:
 		1-gcc
@@ -95,18 +118,18 @@ def usage():
 		2-exporte o exec.out para diretório da barbie
 		3-use o comando no diretório da barbie
 
-	python3 barbie -e exec.out -l https://susy.ic.unicamp.br:9999/TURMA_DE_MC/N_LAB/dados/testes.html
+	python3 barbie -e exec.out -u https://susy.ic.unicamp.br:9999/TURMA_DE_MC/N_LAB/dados/testes.html
 
 	Exemplo:
-	python3 barbie.py -e lab4 -l https://susy.ic.unicamp.br:9999/mc202d/4/dados/testes.html
-	python3 barbie.py -c lab4.c -l https://susy.ic.unicamp.br:9999/mc202d/4/dados/testes.html
+	python3 barbie.py -e lab4 -u https://susy.ic.unicamp.br:9999/mc202d/4/dados/testes.html
+	python3 barbie.py -c lab4.c -u https://susy.ic.unicamp.br:9999/mc202d/4/dados/testes.html
 	by: Mosquito""")
 
 
 def main():
 	
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], "he:c:l:", ["help", "executable=","code=", "link="])
+		opts, args = getopt.getopt(sys.argv[1:], "he:c:u:l", ["help", "executable=","code=", "url=", "local"])
 	except getopt.GetoptError as err:
 		# print help information and exit:
 		print(err)  # will print something like "option -a not recognized"
@@ -116,6 +139,7 @@ def main():
 	exec_file = None
 	url = None
 	source_code = None
+	local = False
 	
 	for o, a in opts:
 		if o in ("-h", "--help"):
@@ -125,12 +149,14 @@ def main():
 			exec_file = os.path.realpath(a)
 		elif o in ("-c", "--code"):
 			source_code = os.path.realpath(a)
-		elif o in ("-l", "--link"):
+		elif o in ("-u", "--url"):
 			url = a
+		elif o in ("-l", "--local"):
+			local = True
 		else:
 			assert False, "unhandled option"
 
-	if not url or (not exec_file and not source_code):
+	if (not url and not local) or (not exec_file and not source_code):
 		usage()
 		sys.exit(2)
 
@@ -151,21 +177,29 @@ def main():
 				print(gcc.read())
 			sys.exit(1)
 
-	tests_dir_name = "testes/"
+	tests_dir_name = os.path.realpath("testes/")
+	in_files = None
+	res_files = None
 
-	# List all susy files of open tests
-	in_files, res_files = susy.get_susy_files(url)
-	# Download all the open tests
-	susy.download_tests(url, in_files, res_files, tests_dir_name)
+	if url:
+		import susy_interface as susy
+		# List all susy files of open tests
+		in_files, res_files = susy.get_susy_files(url)
+		# Download all the open tests
+		susy.download_tests(url, in_files, res_files, tests_dir_name)
 
-	# Excute the tests
-	run_tests(exec_file, in_files, tests_dir_name)
-	# Check the output of each test
-	for arq in res_files:
-		test = arq.split('.')[0]
-		index  = res_files.index(arq)+1
-		# Compare your output with the expected output got from susy
-		compare_susy(os.path.join(tests_dir_name, str(index), arq), os.path.join(tests_dir_name, str(index), test) + '.out', index)
+	if local:
+		in_files, res_files = get_local_tests(tests_dir_name)
+
+	if in_files and res_files:
+		# Excute the tests
+		run_tests(exec_file, in_files, tests_dir_name)
+		# Check the output of each test
+		for arq in res_files:
+			test = os.path.splitext(arq)[0]
+			index  = res_files.index(arq)+1
+			# Compare your output with the expected output got from susy
+			compare_susy(os.path.join(tests_dir_name, str(index), arq), os.path.join(tests_dir_name, str(index), test) + '.out', index)
 
 
 if __name__=="__main__":
