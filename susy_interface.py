@@ -7,19 +7,22 @@ import os
 import urllib.request
 
 from html.parser import HTMLParser
+from urllib.parse import urljoin
 
 # Ignore Susy Certificate
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
+susy_base_url = "https://susy.ic.unicamp.br:9999/"
 
-class SusyHTMLParser(HTMLParser):
-	
-	fechados = False
-	in_files = []
-	res_files = []
-	count = 0
-	out = False
+class SusyTestesHTMLParser(HTMLParser):
+	def __init__(self):
+		HTMLParser.__init__(self)
+		self.fechados = False
+		self.in_files = []
+		self.res_files = []
+		self.count = 0
+		self.out = False
 
 	def handle_starttag(self, tag, attrs):
 		if tag=='a' and not self.fechados:
@@ -43,11 +46,31 @@ class SusyHTMLParser(HTMLParser):
 	def get_res_files(self):
 		return self.res_files
 
+
+class SusyClassHTMLParser(HTMLParser):
+	def __init__(self):
+		HTMLParser.__init__(self)
+		self.terminou = False
+		self.disciplinas = []
+		self.count = 0
+
+	def handle_starttag(self, tag, attrs):
+		if tag=='a' and not self.terminou:
+			self.count+=1
+			self.disciplinas.append(attrs[0][1])
+
+	def handle_endtag(self, tag):
+		if tag=='blockquote':
+			self.terminou = True
+
+	def get_discs(self):
+		return self.disciplinas
+
 def get_susy_files(susy_link):
-	print("Detecting susy test files", end='\r')
+	print("Detecting susy test files")
 	html = requests.get(susy_link, verify=False)
 
-	parser = SusyHTMLParser()
+	parser = SusyTestesHTMLParser()
 	parser.feed(html.text)
 	print("Sucessfully detected %d susy test files to download" % parser.count)
 	return parser.get_in_files(), parser.get_res_files()
@@ -66,6 +89,7 @@ def download_tests(susy_tests_url, in_files, res_files, dir_name):
 		shutil.rmtree(dir_name)
 	except FileNotFoundError:
 		pass
+	
 	os.mkdir(dir_name)
 
 	data_url = '/'.join(susy_path) + '/'
@@ -90,3 +114,48 @@ def download_tests(susy_tests_url, in_files, res_files, dir_name):
 		print()
 		sys.exit('Exiting program')
 
+def _discover_susy_disc(disc, turma):
+	discs = list()
+
+	disc = disc.lower()
+	turma = turma.lower()
+
+	susy_disc = None
+
+	html = requests.get(susy_base_url, verify=False)
+
+	parser = SusyClassHTMLParser()
+	parser.feed(html.text)
+
+	discs = parser.get_discs()
+	for opt in discs:
+		if disc in opt and turma in opt:
+			susy_disc = opt
+	if not susy_disc:
+		assert False, "Turma não encontrada"
+	return susy_disc
+
+def _discover_susy_lab(url, lab):
+	discs = list()
+
+	susy_disc = None
+
+	html = requests.get(url, verify=False)
+
+	parser = SusyClassHTMLParser()
+	parser.feed(html.text)
+
+	discs = parser.get_discs()
+	for opt in discs:
+		if lab in opt:
+			susy_disc = opt
+
+	if not susy_disc:
+		assert False, "Lab não encontrado"
+	return susy_disc + '/'
+
+def discover_susy_url(disc, turma, lab):
+	disc = _discover_susy_disc(disc, turma)
+	url = urljoin(susy_base_url, disc)
+	turma = _discover_susy_lab(url, lab)
+	return urljoin(urljoin(url, turma), 'dados/testes.html')

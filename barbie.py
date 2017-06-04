@@ -79,7 +79,7 @@ def compile_c(source_code):
 	if exec_file == source_code:
 		exec_file += ".out"
 
-	compilation_args = ["gcc", source_code, "-o", exec_file]
+	compilation_args = ["gcc", "-Wall", source_code, "-o", exec_file]
 	with open(gcc_out, 'w') as out:
 		process = subprocess.run(compilation_args, stdout=out, stderr=subprocess.STDOUT)
 	process.check_returncode()
@@ -156,7 +156,7 @@ def main():
 		else:
 			assert False, "unhandled option"
 
-	if (not url and not local) or (not exec_file and not source_code):
+	if (not exec_file and not source_code):
 		usage()
 		sys.exit(2)
 
@@ -180,6 +180,15 @@ def main():
 	tests_dir_name = os.path.realpath("testes/")
 	in_files = None
 	res_files = None
+
+
+	if not url and not local:
+		import susy_interface as susy
+
+		disc  =	input("Disciplina: 	")
+		turma = input("Turma: 		")
+		lab   = input("Lab: 		")
+		url = susy.discover_susy_url(disc, turma, lab)
 
 	if url:
 		import susy_interface as susy
