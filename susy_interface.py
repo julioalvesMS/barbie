@@ -67,12 +67,12 @@ class SusyClassHTMLParser(HTMLParser):
 		return self.disciplinas
 
 def get_susy_files(susy_link):
-	print("Detecting susy test files")
+	__print("Detecting susy test files")
 	html = requests.get(susy_link, verify=False)
 
 	parser = SusyTestesHTMLParser()
 	parser.feed(html.text)
-	print("Sucessfully detected %d susy test files to download" % parser.count)
+	__print("Sucessfully detected %d susy test files to download" % parser.count)
 	return parser.get_in_files(), parser.get_res_files()
 
 
@@ -89,30 +89,31 @@ def download_tests(susy_tests_url, in_files, res_files, dir_name):
 		shutil.rmtree(dir_name)
 	except FileNotFoundError:
 		pass
-	
+
 	os.mkdir(dir_name)
 
 	data_url = '/'.join(susy_path) + '/'
 
-	print()
+	__print()
 	try:
 		for i in range(len(in_files)):
 
 			os.mkdir(os.path.join(dir_name, str(i+1)))
-			
+
 			# download test input
-			print('Downloading file %d of %d' %(i*2+1, len(in_files)*2), end='\r')
+			__print('Downloading file %d of %d' %(i*2+1, len(in_files)*2), end='\r')
 			download_file(data_url + in_files[i], os.path.join(dir_name, str(i+1), in_files[i]))
-			
+
 			# Download test output
-			print('Downloading file %d of %d' %(i*2+2, len(in_files)*2), end='\r')
+			__print('Downloading file %d of %d' %(i*2+2, len(in_files)*2), end='\r')
 			download_file(data_url + res_files[i], os.path.join(dir_name, str(i+1), res_files[i]))
-	
+
 	except Exception as e:
-		print('Connection Failed!')
-		print('Error:', e)
-		print()
-		sys.exit('Exiting program')
+		eprint('Connection Failed!')
+		eprint('Error:', e)
+		eprint()
+		eprint('Não foi possível obter os arquivos do sistema Susy')
+		raise Exception
 
 def _discover_susy_disc(disc, turma):
 	discs = list()
@@ -159,3 +160,12 @@ def discover_susy_url(disc, turma, lab):
 	url = urljoin(susy_base_url, disc)
 	turma = _discover_susy_lab(url, lab)
 	return urljoin(urljoin(url, turma), 'dados/testes.html')
+
+def __print(*args, **kargs):
+	if not supress_output:
+		print(*args, **kargs)
+
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
+supress_output = False

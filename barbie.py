@@ -6,6 +6,21 @@ import os.path
 import getopt
 import tempfile
 import os
+import susy_interface as susy
+
+class BarbieTest():
+	def __init__(self, difference_count, first_error_out, first_error_susy, id, path_out, path_susy, path_cmp):
+		self.first_error_out = first_error_out
+		self.first_error_susy = first_error_susy
+		self.difference_count = difference_count
+		self.correct = (difference_count==0)
+		self.id = id
+
+		self.path_out = path_out
+		self.path_susy = path_susy
+		self.path_cmp = path_cmp
+		self.path_folder = os.path.split(path_susy)[0]
+
 
 # Execute the code with the input from the in_file and save the output in the out_dir
 def exe_code(exec_file, in_file, out_dir, index):
@@ -18,28 +33,31 @@ def exe_code(exec_file, in_file, out_dir, index):
 # Execute the code with all the test files
 def run_tests(exec_file, in_files, out_dir):
 	size = len(in_files)
-	print()
+	__print()
 	for i in range(size):
-		print('Executing test %d of %d' %(i+1, size), end='\r')
+		__print('Executing test %d of %d' %(i+1, size), end='\r')
 		exe_code(exec_file, in_files[i], out_dir, i+1)
-	print()
+	__print()
 
 # Compare the code output with the expected result
 def compare_susy(susy_file, out_file, index):
 	# Open our output and the susy answer
 	susy = open(susy_file)
 	test = open(out_file)
+	path_cmp = susy_file.split('.')[0] + '.cmp'
 	# Let's write a .cmp comparison file
-	with open(susy_file.split('.')[0] + '.cmp', 'w') as barbie_out:
+	with open(path_cmp, 'w') as barbie_out:
 
 		s_lines = susy.readlines()
 		t_lines = test.readlines()
 
 		difference_count = 0
+		first_error_out = None
+		first_error_susy = None
 
 		# Number of lines of each output
-		msg_1 = "Susy file: %s with %d lines\n" % (susy_file, len(s_lines))
-		msg_2 = "Test file: %s with %d lines\n" % (out_file, len(t_lines))
+		msg_1 = "Arquivo de resposta: %d Linhas\n" % (len(s_lines))
+		msg_2 = "Arquivo de saida: %d Linhas\n" % (len(t_lines))
 
 		# Write to the file
 		barbie_out.write(msg_1)
@@ -52,6 +70,10 @@ def compare_susy(susy_file, out_file, index):
 				# Save difference
 				msg_s = "[%d] susy: %s" % (i, s_lines[i])
 				msg_o = "[%d] out:  %s" % (i, t_lines[i])
+
+				if not first_error_out:
+					first_error_out = msg_o
+					first_error_susy = msg_s
 
 				# Write to file
 				barbie_out.write(msg_s)
@@ -68,11 +90,13 @@ def compare_susy(susy_file, out_file, index):
 		else:
 			msg_t = "Teste %d: Resultado incorreto. Linhas divergentes: %d" % (index, difference_count)
 
-		print(msg_t,)
+		__print(msg_t,)
 
 
 	susy.close()
 	test.close()
+
+	return BarbieTest(difference_count, first_error_out, first_error_susy, index, out_file, susy_file, path_cmp)
 
 
 def _gcc_output_file(source_code):
@@ -118,6 +142,7 @@ def get_local_tests(tests_folder):
 	return in_files, res_files
 
 def run_and_compare(exec_file, in_files, res_files, tests_dir_name):
+	results = list()
 	# Excute the tests
 	run_tests(exec_file, in_files, tests_dir_name)
 	# Check the output of each test
@@ -125,10 +150,12 @@ def run_and_compare(exec_file, in_files, res_files, tests_dir_name):
 		test = os.path.splitext(arq)[0]
 		index  = res_files.index(arq)+1
 		# Compare your output with the expected output got from susy
-		compare_susy(os.path.join(tests_dir_name, str(index), arq), os.path.join(tests_dir_name, str(index), test) + '.out', index)
+		results.append(compare_susy(os.path.join(tests_dir_name, str(index), arq), os.path.join(tests_dir_name, str(index), test) + '.out', index))
+
+	return results
 
 def usage():
-	print("""\
+	__print("""\
 	Welcome to Barbie!
 	The Susy Simulator
 
@@ -148,7 +175,7 @@ def main():
 		opts, args = getopt.getopt(sys.argv[1:], "he:c:u:l", ["help", "executable=","code=", "url=", "local"])
 	except getopt.GetoptError as err:
 		# print help information and exit:
-		print(err)  # will print something like "option -a not recognized"
+		__print(err)  # will print something like "option -a not recognized"
 		usage()
 		sys.exit(2)
 
@@ -182,16 +209,16 @@ def main():
 		# Try to compile the source code
 		try:
 			exec_file = compile_c([source_code])
-			print('Código compilado com sucesso!')
+			__print('Código compilado com sucesso!')
 		# If there was a compilation problem
 		except subprocess.CalledProcessError:
 			# Notificate the user about the problem
 			gcc_f = _gcc_output_file(source_code)
-			print("Falha na compilação!")
-			print("OUTPUT >>>", gcc_f)
+			eprint("Falha na compilação!")
+			eprint("OUTPUT >>>", gcc_f)
 			# Show the compilation output and end the program
 			with open(gcc_f, 'r') as gcc:
-				print(gcc.read())
+				eprint(gcc.read())
 			sys.exit(1)
 
 	tests_dir_name = os.path.realpath("testes/")
@@ -201,7 +228,6 @@ def main():
 	# If the program is not set to run locally and no url was given,
 	# prompt user for the class info and discover the url
 	if not url and not local:
-		import susy_interface as susy
 
 		disc  =	input("Disciplina: 	")
 		turma = input("Turma: 		")
@@ -210,7 +236,6 @@ def main():
 
 	# The user may input the url from the desired tests page
 	if url:
-		import susy_interface as susy
 		# List all susy files of open tests
 		in_files, res_files = susy.get_susy_files(url)
 		# Download all the open tests
@@ -225,6 +250,16 @@ def main():
 	if in_files and res_files:
 		run_and_compare(exec_file, in_files, res_files, tests_dir_name)
 
+def __print(*args, **kargs):
+	if not supress_output:
+		print(*args, **kargs)
+
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
 
 if __name__=="__main__":
+	supress_output = False
 	main()
+else:
+	supress_output = True
+	susy.supress_output = True
