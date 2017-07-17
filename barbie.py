@@ -4,12 +4,14 @@ import sys
 import subprocess
 import os.path
 import getopt
+import tempfile
+import os
 
 # Execute the code with the input from the in_file and save the output in the out_dir
 def exe_code(exec_file, in_file, out_dir, index):
 	out = open(os.path.join(out_dir, str(index), in_file.split('.')[0]) + '.out', 'w')
 	ins = open(os.path.join(out_dir, str(index), in_file), 'r')
-	subprocess.Popen(exec_file, stdin=ins, stdout=out, stderr=subprocess.STDOUT, universal_newlines=True)
+	subprocess.Popen(exec_file, stdin=ins, stdout=out, stderr=out, universal_newlines=True)
 	out.close()
 	ins.close()
 
@@ -25,12 +27,8 @@ def run_tests(exec_file, in_files, out_dir):
 # Compare the code output with the expected result
 def compare_susy(susy_file, out_file, index):
 	# Open our output and the susy answer
-	# Let's write a .cmp comparison file
-	with open(susy_file.split('.')[0] + '.cmp', 'w') as barbie_out:
-
-		s_lines = susy.readlines()
-		t_lines = test.readlines()
-
+	susy = open(susy_file)
+	test = open(out_file)
 	# Let's write a .cmp comparison file
 	with open(susy_file.split('.')[0] + '.cmp', 'w') as barbie_out:
 
@@ -78,21 +76,23 @@ def compare_susy(susy_file, out_file, index):
 
 
 def _gcc_output_file(source_code):
-	return os.path.splitext(source_code)[0] + '.gcc'
+	return os.path.splitext(source_code[0])[0] + '.gcc'
 
-def compile_c(source_code):
-	# Define the gcc output and the compile code files names
-	gcc_out = _gcc_output_file(source_code)
-	exec_file = os.path.splitext(source_code)[0]
+def compile_c(source_code, temp=False, dir='./'):
 
-	# Avoid the possibility of having the output with the same name as the input
-	if exec_file == source_code:
-		exec_file += ".out"
+	temp_exe, exec_file = tempfile.mkstemp(dir=dir, suffix='.out')
+	os.close(temp_exe)
 
 	# Compile source code
-	compilation_args = ["gcc", "-Wall", source_code, "-o", exec_file]
-	with open(gcc_out, 'w') as out:
-		process = subprocess.run(compilation_args, stdout=out, stderr=subprocess.STDOUT)
+	compilation_args = ["gcc", "-Wall", "-o", exec_file] + source_code
+	if not temp:
+		gcc_out = _gcc_output_file(source_code)
+		with open(gcc_out, 'w') as out:
+			process = subprocess.run(compilation_args, stdout=out, stderr=subprocess.STDOUT)
+	else:
+		with tempfile.NamedTemporaryFile() as out:
+			process = subprocess.run(compilation_args, stdout=out, stderr=subprocess.STDOUT)
+
 	# Check if the compilation failed, in wich case an Exception is raised
 	process.check_returncode()
 	# Return the path to the executable file
@@ -181,7 +181,7 @@ def main():
 	if source_code:
 		# Try to compile the source code
 		try:
-			exec_file = compile_c(source_code)
+			exec_file = compile_c([source_code])
 			print('Código compilado com sucesso!')
 		# If there was a compilation problem
 		except subprocess.CalledProcessError:
@@ -209,7 +209,7 @@ def main():
 		url = susy.discover_susy_url(disc, turma, lab)
 
 	# The user may input the url from the desired tests page
-	elif url:
+	if url:
 		import susy_interface as susy
 		# List all susy files of open tests
 		in_files, res_files = susy.get_susy_files(url)
@@ -217,7 +217,7 @@ def main():
 		susy.download_tests(url, in_files, res_files, tests_dir_name)
 
 	# Option to run the program locally, and don't acess Susy
-	elif local:
+	if local:
 		in_files, res_files = get_local_tests(tests_dir_name)
 
 	# If we sucessufuly got all needed files,
