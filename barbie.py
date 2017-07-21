@@ -105,22 +105,23 @@ def _gcc_output_file(source_code):
 def compile_c(source_code, temp=False, dir='./'):
 
 	temp_exe, exec_file = tempfile.mkstemp(dir=dir, suffix='.out')
+	temp_gcc, gcc_out = tempfile.mkstemp(dir=dir, suffix='.gcc')
 	os.close(temp_exe)
+	os.close(temp_gcc)
 
-	# Compile source code
+	# Compile source codes
 	compilation_args = ["gcc", "-Wall", "-o", exec_file] + source_code
-	if not temp:
-		gcc_out = _gcc_output_file(source_code)
-		with open(gcc_out, 'w') as out:
-			process = subprocess.run(compilation_args, stdout=out, stderr=subprocess.STDOUT)
-	else:
-		with tempfile.NamedTemporaryFile() as out:
-			process = subprocess.run(compilation_args, stdout=out, stderr=subprocess.STDOUT)
+	with open(gcc_out, 'w') as out:
+		process = subprocess.run(compilation_args, stdout=out, stderr=subprocess.STDOUT)
 
-	# Check if the compilation failed, in wich case an Exception is raised
-	process.check_returncode()
+	try:
+		# Check if the compilation failed, in wich case an Exception is raised
+		process.check_returncode()
+		sucess = True
+	except:
+		sucess = False
 	# Return the path to the executable file
-	return exec_file
+	return exec_file, gcc_out, sucess
 
 def get_local_tests(tests_folder):
 	in_files  = []
@@ -208,12 +209,12 @@ def main():
 	if source_code:
 		# Try to compile the source code
 		try:
-			exec_file = compile_c([source_code])
+			exec_file, gcc_f, sucess = compile_c([source_code])
+			assert sucess, "Falha na compilação"
 			__print('Código compilado com sucesso!')
 		# If there was a compilation problem
-		except subprocess.CalledProcessError:
+		except AssertionError as e:
 			# Notificate the user about the problem
-			gcc_f = _gcc_output_file(source_code)
 			eprint("Falha na compilação!")
 			eprint("OUTPUT >>>", gcc_f)
 			# Show the compilation output and end the program
