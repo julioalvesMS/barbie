@@ -132,7 +132,7 @@ def _discover_susy_disc(disc, turma):
 	for opt in discs:
 		if disc in opt and turma in opt:
 			susy_disc = opt
-	assert susy_disc, "Disciplina e turma não encontrada"
+	assert susy_disc, "Não foi possível encontrar a disciplina e sua turma correspondente"
 	return susy_disc
 
 def _discover_susy_lab(url, lab):

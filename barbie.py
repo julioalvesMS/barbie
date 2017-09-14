@@ -78,6 +78,8 @@ def compare_susy(susy_file, out_file, index):
 				# Write to file
 				barbie_out.write(msg_s)
 				barbie_out.write(msg_o)
+				
+				difference_count+=1
 
 		# Number of different lines encountered
 		difference_count += abs(len(s_lines) - len(t_lines))
@@ -156,27 +158,31 @@ def run_and_compare(exec_file, in_files, res_files, tests_dir_name):
 	return results
 
 def usage():
+	options = []
 	__print("""\
-	Welcome to Barbie!
-	The Susy Simulator
+Barbie!
+The Susy Simulator
 
+usage: python3 barbie.py [-h] [-e] [-u] [-l] [Arquivos de código]
 
-	python3 barbie -e exec.out -u https://susy.ic.unicamp.br:9999/TURMA_DE_MC/N_LAB/dados/testes.html
-
-	Exemplo:
-	python3 barbie.py -e lab4 -u https://susy.ic.unicamp.br:9999/mc202d/4/dados/testes.html
-	python3 barbie.py -c lab4.c -u https://susy.ic.unicamp.br:9999/mc202d/4/dados/testes.html
-	python3 barbie.py -c lab4
-	by: Mosquito""")
+Opções:
+			Mostra as opções de linha de comando
+-e,	--executable	Executa a barbie utilizando um arquivo
+						executavel, de um código já compilado
+-u, --url			Fornecer diretamente o link da página
+						com os arquivos de teste do susy
+-l, --local			Não acessa o Susy e faz os testes com os
+						arquivos já baixados anteriormente
+by: Mosquito""")
 
 
 def main():
 
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], "he:c:u:l", ["help", "executable=","code=", "url=", "local"])
+		opts, args = getopt.getopt(sys.argv[1:], "he:u:l", ["help", "executable=","url=", "local"])
 	except getopt.GetoptError as err:
 		# print help information and exit:
-		__print(err)  # will print something like "option -a not recognized"
+		eprint(err)  # will print something like "option -a not recognized"
 		usage()
 		sys.exit(2)
 
@@ -191,8 +197,6 @@ def main():
 			sys.exit()
 		elif o in ("-e", "--executable"):
 			exec_file = os.path.realpath(a)
-		elif o in ("-c", "--code"):
-			source_code = os.path.realpath(a)
 		elif o in ("-u", "--url"):
 			url = a
 		elif o in ("-l", "--local"):
@@ -200,18 +204,34 @@ def main():
 		else:
 			assert False, "unhandled option"
 
+	_files = dict()
+	for path in args:
+		# Get extension
+		ext = os.path.splitext(path)[1][1:].strip()
+		if ext not in _files:
+			_files[ext] = list()
+		# Save in the dict the path to this file
+		_files[ext].append(path)
+
+
 	# We need to receive at least a
-	if (not exec_file and not source_code):
+	if (	not exec_file and not _files):
 		usage()
 		sys.exit(2)
 
 	# If the user got us one, compile the source code
-	if source_code:
+	if _files:
 		# Try to compile the source code
 		try:
-			exec_file, gcc_f, sucess = compile_c([source_code])
+			source_code = _files['c']
+			exec_file, gcc_f, sucess = compile_c(source_code)
 			assert sucess, "Falha na compilação"
 			__print('Código compilado com sucesso!')
+		# If there is no .c file
+		except KeyError:
+			eprint('Nenhum arquivo .c fornecido')
+			usage()
+			sys.exit(2)
 		# If there was a compilation problem
 		except AssertionError as e:
 			# Notificate the user about the problem
