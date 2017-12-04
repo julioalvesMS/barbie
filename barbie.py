@@ -26,7 +26,7 @@ class BarbieTest():
 def exe_code(exec_file, in_file, out_dir, index):
 	out = open(os.path.join(out_dir, str(index), in_file.split('.')[0]) + '.out', 'w')
 	ins = open(os.path.join(out_dir, str(index), in_file), 'r')
-	subprocess.Popen(exec_file, stdin=ins, stdout=out, stderr=out, universal_newlines=True)
+	subprocess.run(exec_file, stdin=ins, stdout=out, stderr=out, universal_newlines=True, timeout=2)
 	out.close()
 	ins.close()
 
@@ -43,7 +43,15 @@ def run_tests(exec_file, in_files, out_dir):
 def compare_susy(susy_file, out_file, index):
 	# Open our output and the susy answer
 	susy = open(susy_file)
-	test = open(out_file)
+	try:
+		test = open(out_file)
+	except FileNotFoundError:
+		folder = os.path.dirname(susy_file)
+		for file in os.listdir(folder):
+			if file.endswith(".out"):
+				out_file = os.path.join(folder, file)
+				break
+		test = open(out_file)
 	path_cmp = susy_file.split('.')[0] + '.cmp'
 	# Let's write a .cmp comparison file
 	with open(path_cmp, 'w') as barbie_out:
@@ -78,7 +86,7 @@ def compare_susy(susy_file, out_file, index):
 				# Write to file
 				barbie_out.write(msg_s)
 				barbie_out.write(msg_o)
-				
+
 				difference_count+=1
 
 		# Number of different lines encountered
@@ -134,10 +142,10 @@ def get_local_tests(tests_folder):
 		if root is not tests_folder:
 			for arq in files:
 				# Check the extension
-				ext = os.path.splitext(arq)[1]
-				if ext == '.in': # input file
+				name, ext = os.path.splitext(arq)
+				if (ext == '.in' or 'in' in name) and ext not in ['.cmp', '.out']: # input file
 					in_files.append(arq)
-				elif ext == '.res': # result file
+				elif (ext == '.res' or 'res' in name) and ext not in ['.cmp', '.out']: # result file
 					res_files.append(arq)
 	# Sort the files, so they are executed in order
 	in_files.sort()
@@ -184,7 +192,7 @@ def main():
 		# print help information and exit:
 		eprint(err)  # will print something like "option -a not recognized"
 		usage()
-		sys.exit(2)
+		exit(2)
 
 	exec_file = None
 	url = None
@@ -194,7 +202,7 @@ def main():
 	for o, a in opts:
 		if o in ("-h", "--help"):
 			usage()
-			sys.exit()
+			exit()
 		elif o in ("-e", "--executable"):
 			exec_file = os.path.realpath(a)
 		elif o in ("-u", "--url"):
@@ -217,7 +225,7 @@ def main():
 	# We need to receive at least a
 	if (	not exec_file and not _files):
 		usage()
-		sys.exit(2)
+		exit(2)
 
 	# If the user got us one, compile the source code
 	if _files:
@@ -227,11 +235,13 @@ def main():
 			exec_file, gcc_f, sucess = compile_c(source_code)
 			assert sucess, "Falha na compilação"
 			__print('Código compilado com sucesso!')
+			to_be_deleted.append(gcc_f)
+			to_be_deleted.append(exec_file)
 		# If there is no .c file
 		except KeyError:
 			eprint('Nenhum arquivo .c fornecido')
 			usage()
-			sys.exit(2)
+			exit(2)
 		# If there was a compilation problem
 		except AssertionError as e:
 			# Notificate the user about the problem
@@ -240,7 +250,7 @@ def main():
 			# Show the compilation output and end the program
 			with open(gcc_f, 'r') as gcc:
 				eprint(gcc.read())
-			sys.exit(1)
+			exit(1)
 
 	tests_dir_name = os.path.realpath("testes/")
 	in_files = None
@@ -266,10 +276,12 @@ def main():
 	if local:
 		in_files, res_files = get_local_tests(tests_dir_name)
 
+
 	# If we sucessufuly got all needed files,
 	# we may run all tests and compare our output with the expected
 	if in_files and res_files:
 		run_and_compare(exec_file, in_files, res_files, tests_dir_name)
+	exit()
 
 def __print(*args, **kargs):
 	if not supress_output:
@@ -278,6 +290,12 @@ def __print(*args, **kargs):
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
+def exit(*args, **kwargs):
+	for file in to_be_deleted:
+		os.remove(file)
+	sys.exit(*args, **kwargs)
+
+to_be_deleted = list()
 if __name__=="__main__":
 	supress_output = False
 	main()
