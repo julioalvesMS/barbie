@@ -7,6 +7,8 @@ import getopt
 import tempfile
 import os
 import susy_interface as susy
+from codes import PythonCode, CCode, CodeLanguage
+
 
 class BarbieTest():
 	def __init__(self, difference_count, first_error_out, first_error_susy, id, path_out, path_susy, path_cmp):
@@ -23,20 +25,20 @@ class BarbieTest():
 
 
 # Execute the code with the input from the in_file and save the output in the out_dir
-def exe_code(exec_file, in_file, out_dir, index):
+def exe_code(user_code, in_file, out_dir, index):
 	out = open(os.path.join(out_dir, str(index), in_file.split('.')[0]) + '.out', 'w')
 	ins = open(os.path.join(out_dir, str(index), in_file), 'r')
-	subprocess.run(exec_file, stdin=ins, stdout=out, stderr=out, universal_newlines=True, timeout=2)
+	user_code.run(stdin=ins, stdout=out, stderr=out, timeout=200)
 	out.close()
 	ins.close()
 
 # Execute the code with all the test files
-def run_tests(exec_file, in_files, out_dir):
+def run_tests(user_code, in_files, out_dir):
 	size = len(in_files)
 	__print()
 	for i in range(size):
 		__print('Executing test %d of %d' %(i+1, size), end='\r')
-		exe_code(exec_file, in_files[i], out_dir, i+1)
+		exe_code(user_code, in_files[i], out_dir, i+1)
 	__print()
 
 # Compare the code output with the expected result
@@ -152,10 +154,10 @@ def get_local_tests(tests_folder):
 	res_files.sort()
 	return in_files, res_files
 
-def run_and_compare(exec_file, in_files, res_files, tests_dir_name):
+def run_and_compare(user_code, in_files, res_files, tests_dir_name):
 	results = list()
 	# Excute the tests
-	run_tests(exec_file, in_files, tests_dir_name)
+	run_tests(user_code, in_files, tests_dir_name)
 	# Check the output of each test
 	for arq in res_files:
 		test = os.path.splitext(arq)[0]
@@ -219,7 +221,7 @@ def main():
 		if ext not in _files:
 			_files[ext] = list()
 		# Save in the dict the path to this file
-		_files[ext].append(path)
+		_files[ext].append(os.path.realpath(path))
 
 
 	# We need to receive at least a
@@ -227,16 +229,24 @@ def main():
 		usage()
 		exit(2)
 
+	user_code = None
+
 	# If the user got us one, compile the source code
 	if _files:
 		# Try to compile the source code
 		try:
-			source_code = _files['c']
-			exec_file, gcc_f, sucess = compile_c(source_code)
-			assert sucess, "Falha na compilação"
-			__print('Código compilado com sucesso!')
-			to_be_deleted.append(gcc_f)
-			to_be_deleted.append(exec_file)
+			if 'py' in _files:
+				user_code = PythonCode()
+				user_code.source_files = _files['py']
+				user_code.exec_file = _files['py'][0]
+			else:
+				user_code.source_files = _files['c']
+				exec_file, gcc_f, sucess = compile_c(user_code.source_files)
+				user_code.exec_file = exec_file
+				assert sucess, "Falha na compilação"
+				__print('Código compilado com sucesso!')
+				to_be_deleted.append(gcc_f)
+				to_be_deleted.append(exec_file)
 		# If there is no .c file
 		except KeyError:
 			eprint('Nenhum arquivo .c fornecido')
@@ -280,7 +290,7 @@ def main():
 	# If we sucessufuly got all needed files,
 	# we may run all tests and compare our output with the expected
 	if in_files and res_files:
-		run_and_compare(exec_file, in_files, res_files, tests_dir_name)
+		run_and_compare(user_code, in_files, res_files, tests_dir_name)
 	exit()
 
 def __print(*args, **kargs):
