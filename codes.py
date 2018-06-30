@@ -6,7 +6,7 @@ class CodeLanguage():
 	exec_file = None
 
 	def run(self, stdin, stdout, stderr, timeout=200):
-		pass
+		subprocess.run(self.exec_file, stdin=stdin, stdout=stdout, stderr=stderr, universal_newlines=True, timeout=timeout)
 
 class PythonCode(CodeLanguage):
 

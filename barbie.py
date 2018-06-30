@@ -225,7 +225,7 @@ def main():
 
 
 	# We need to receive at least a
-	if (	not exec_file and not _files):
+	if (not exec_file and not _files):
 		usage()
 		exit(2)
 
@@ -261,6 +261,9 @@ def main():
 			with open(gcc_f, 'r') as gcc:
 				eprint(gcc.read())
 			exit(1)
+	elif exec_file:
+		user_code = CodeLanguage();
+		user_code.exec_file = exec_file
 
 	tests_dir_name = os.path.realpath("testes/")
 	in_files = None
