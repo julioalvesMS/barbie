@@ -23,20 +23,20 @@ class BarbieTest():
 
 
 # Execute the code with the input from the in_file and save the output in the out_dir
-def exe_code(exec_file, in_file, out_dir, index):
+def exe_code(exec_file, in_file, out_dir, index, timeout):
 	out = open(os.path.join(out_dir, str(index), in_file.split('.')[0]) + '.out', 'w')
 	ins = open(os.path.join(out_dir, str(index), in_file), 'r')
-	subprocess.run(exec_file, stdin=ins, stdout=out, stderr=out, universal_newlines=True, timeout=2)
+	subprocess.run(exec_file, stdin=ins, stdout=out, stderr=out, universal_newlines=True, timeout=timeout)
 	out.close()
 	ins.close()
 
 # Execute the code with all the test files
-def run_tests(exec_file, in_files, out_dir):
+def run_tests(exec_file, in_files, out_dir, timeout):
 	size = len(in_files)
 	__print()
 	for i in range(size):
 		__print('Executing test %d of %d' %(i+1, size), end='\r')
-		exe_code(exec_file, in_files[i], out_dir, i+1)
+		exe_code(exec_file, in_files[i], out_dir, i+1, timeout)
 	__print()
 
 # Compare the code output with the expected result
@@ -93,7 +93,7 @@ def compare_susy(susy_file, out_file, index):
 		difference_count += abs(len(s_lines) - len(t_lines))
 
 		msg_f =  "\nDifference count: %d" % difference_count
-		barbie_out.write(msg_f)
+		barbie_out.write(msg_f+'\n')
 
 		if not difference_count:
 			msg_t = "Teste %d: Resultado correto!" % (index)
@@ -152,10 +152,10 @@ def get_local_tests(tests_folder):
 	res_files.sort()
 	return in_files, res_files
 
-def run_and_compare(exec_file, in_files, res_files, tests_dir_name):
+def run_and_compare(exec_file, in_files, res_files, tests_dir_name, timeout=2):
 	results = list()
 	# Excute the tests
-	run_tests(exec_file, in_files, tests_dir_name)
+	run_tests(exec_file, in_files, tests_dir_name,timeout)
 	# Check the output of each test
 	for arq in res_files:
 		test = os.path.splitext(arq)[0]
@@ -171,7 +171,7 @@ def usage():
 Barbie!
 The Susy Simulator
 
-usage: python3 barbie.py [-h] [-e] [-u] [-l] [Arquivos de código]
+usage: python3 barbie.py [-h] [-e] [-u] [-l] [-t] [Arquivos de código]
 
 Opções:
 			Mostra as opções de linha de comando
@@ -181,13 +181,15 @@ Opções:
 						com os arquivos de teste do susy
 -l, --local			Não acessa o Susy e faz os testes com os
 						arquivos já baixados anteriormente
+-t, --timeout		Define o timeout de execução de cada teste
+						o valor deve ser dado em segundos
 by: Mosquito""")
 
 
 def main():
 
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], "he:u:l", ["help", "executable=","url=", "local"])
+		opts, args = getopt.getopt(sys.argv[1:], "he:u:lt:", ["help", "executable=","url=", "local", "timeout"])
 	except getopt.GetoptError as err:
 		# print help information and exit:
 		eprint(err)  # will print something like "option -a not recognized"
@@ -198,6 +200,7 @@ def main():
 	url = None
 	source_code = None
 	local = False
+	timeout = 2
 
 	for o, a in opts:
 		if o in ("-h", "--help"):
@@ -209,6 +212,8 @@ def main():
 			url = a
 		elif o in ("-l", "--local"):
 			local = True
+		elif o in ("-t", "--timeout"):
+			timeout = int(a)
 		else:
 			assert False, "unhandled option"
 
@@ -280,7 +285,7 @@ def main():
 	# If we sucessufuly got all needed files,
 	# we may run all tests and compare our output with the expected
 	if in_files and res_files:
-		run_and_compare(exec_file, in_files, res_files, tests_dir_name)
+		run_and_compare(exec_file, in_files, res_files, tests_dir_name, timeout)
 	exit()
 
 def __print(*args, **kargs):
