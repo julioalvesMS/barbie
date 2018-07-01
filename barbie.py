@@ -7,6 +7,7 @@ import getopt
 import tempfile
 import os
 import susy_interface as susy
+from barbie_exceptions import UnknownLanguageException
 from codes import PythonCode, CCode, CodeLanguage
 
 
@@ -28,7 +29,7 @@ class BarbieTest():
 def exe_code(user_code, in_file, out_dir, index, timeout):
 	out = open(os.path.join(out_dir, str(index), in_file.split('.')[0]) + '.out', 'w')
 	ins = open(os.path.join(out_dir, str(index), in_file), 'r')
-	user_code.run(stdin=ins, stdout=out, stderr=out, timeout=200, timeout=timeout)
+	user_code.run(stdin=ins, stdout=out, stderr=out, timeout=timeout)
 	out.close()
 	ins.close()
 
@@ -244,7 +245,8 @@ def main():
 				user_code = PythonCode()
 				user_code.source_files = _files['py']
 				user_code.exec_file = _files['py'][0]
-			else:
+			elif 'c' in _files:
+				user_code = CCode()
 				user_code.source_files = _files['c']
 				exec_file, gcc_f, sucess = compile_c(user_code.source_files)
 				user_code.exec_file = exec_file
@@ -252,9 +254,11 @@ def main():
 				__print('Código compilado com sucesso!')
 				to_be_deleted.append(gcc_f)
 				to_be_deleted.append(exec_file)
+			else:
+				raise UnknownLanguageException
 		# If there is no .c file
-		except KeyError:
-			eprint('Nenhum arquivo .c fornecido')
+		except UnknownLanguageException:
+			eprint('Não foi fornecido código de nenhuma linguagem conhecida')
 			usage()
 			exit(2)
 		# If there was a compilation problem
@@ -298,7 +302,7 @@ def main():
 	# If we sucessufuly got all needed files,
 	# we may run all tests and compare our output with the expected
 	if in_files and res_files:
-		run_and_compare(exec_file, in_files, res_files, tests_dir_name, timeout)
+		run_and_compare(user_code, in_files, res_files, tests_dir_name, timeout)
 	exit()
 
 def __print(*args, **kargs):
