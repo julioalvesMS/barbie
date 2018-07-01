@@ -7,6 +7,8 @@ import getopt
 import tempfile
 import os
 import susy_interface as susy
+from codes import PythonCode, CCode, CodeLanguage
+
 
 class BarbieTest():
 	def __init__(self, difference_count, first_error_out, first_error_susy, id, path_out, path_susy, path_cmp):
@@ -23,10 +25,10 @@ class BarbieTest():
 
 
 # Execute the code with the input from the in_file and save the output in the out_dir
-def exe_code(exec_file, in_file, out_dir, index, timeout):
+def exe_code(user_code, in_file, out_dir, index, timeout):
 	out = open(os.path.join(out_dir, str(index), in_file.split('.')[0]) + '.out', 'w')
 	ins = open(os.path.join(out_dir, str(index), in_file), 'r')
-	subprocess.run(exec_file, stdin=ins, stdout=out, stderr=out, universal_newlines=True, timeout=timeout)
+	user_code.run(stdin=ins, stdout=out, stderr=out, timeout=200, timeout=timeout)
 	out.close()
 	ins.close()
 
@@ -224,24 +226,32 @@ def main():
 		if ext not in _files:
 			_files[ext] = list()
 		# Save in the dict the path to this file
-		_files[ext].append(path)
+		_files[ext].append(os.path.realpath(path))
 
 
 	# We need to receive at least a
-	if (	not exec_file and not _files):
+	if (not exec_file and not _files):
 		usage()
 		exit(2)
+
+	user_code = None
 
 	# If the user got us one, compile the source code
 	if _files:
 		# Try to compile the source code
 		try:
-			source_code = _files['c']
-			exec_file, gcc_f, sucess = compile_c(source_code)
-			assert sucess, "Falha na compilação"
-			__print('Código compilado com sucesso!')
-			to_be_deleted.append(gcc_f)
-			to_be_deleted.append(exec_file)
+			if 'py' in _files:
+				user_code = PythonCode()
+				user_code.source_files = _files['py']
+				user_code.exec_file = _files['py'][0]
+			else:
+				user_code.source_files = _files['c']
+				exec_file, gcc_f, sucess = compile_c(user_code.source_files)
+				user_code.exec_file = exec_file
+				assert sucess, "Falha na compilação"
+				__print('Código compilado com sucesso!')
+				to_be_deleted.append(gcc_f)
+				to_be_deleted.append(exec_file)
 		# If there is no .c file
 		except KeyError:
 			eprint('Nenhum arquivo .c fornecido')
@@ -256,6 +266,9 @@ def main():
 			with open(gcc_f, 'r') as gcc:
 				eprint(gcc.read())
 			exit(1)
+	elif exec_file:
+		user_code = CodeLanguage();
+		user_code.exec_file = exec_file
 
 	tests_dir_name = os.path.realpath("testes/")
 	in_files = None
