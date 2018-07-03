@@ -5,6 +5,7 @@ import requests
 import shutil
 import os
 import urllib.request
+import log
 
 from html.parser import HTMLParser
 from urllib.parse import urljoin
@@ -67,12 +68,12 @@ class SusyClassHTMLParser(HTMLParser):
 		return self.disciplinas
 
 def get_susy_files(susy_link):
-	__print("Detecting susy test files")
+	log.uprint("Detecting susy test files")
 	html = requests.get(susy_link, verify=False)
 
 	parser = SusyTestesHTMLParser()
 	parser.feed(html.text)
-	__print("Sucessfully detected %d susy test files to download" % parser.count)
+	log.uprint("Sucessfully detected %d susy test files to download" % parser.count)
 	return parser.get_in_files(), parser.get_res_files()
 
 
@@ -94,25 +95,25 @@ def download_tests(susy_tests_url, in_files, res_files, dir_name):
 
 	data_url = '/'.join(susy_path) + '/'
 
-	__print()
+	log.uprint()
 	try:
 		for i in range(len(in_files)):
 
 			os.mkdir(os.path.join(dir_name, str(i+1)))
 
 			# download test input
-			__print('Downloading file %d of %d' %(i*2+1, len(in_files)*2), end='\r')
+			log.uprint('Downloading file %d of %d' %(i*2+1, len(in_files)*2), end='\r')
 			download_file(data_url + in_files[i], os.path.join(dir_name, str(i+1), in_files[i]))
 
 			# Download test output
-			__print('Downloading file %d of %d' %(i*2+2, len(in_files)*2), end='\r')
+			log.uprint('Downloading file %d of %d' %(i*2+2, len(in_files)*2), end='\r')
 			download_file(data_url + res_files[i], os.path.join(dir_name, str(i+1), res_files[i]))
 
 	except Exception as e:
-		eprint('Connection Failed!')
-		eprint('Error:', e)
-		eprint()
-		eprint('Não foi possível obter os arquivos do sistema Susy')
+		log.eprint('Connection Failed!')
+		log.eprint('Error:', e)
+		log.eprint()
+		log.eprint('Não foi possível obter os arquivos do sistema Susy')
 		raise Exception
 
 def _discover_susy_disc(disc, turma):
@@ -159,11 +160,5 @@ def discover_susy_url(disc, turma, lab):
 	turma = _discover_susy_lab(url, lab)
 	return urljoin(urljoin(url, turma), 'dados/testes.html')
 
-def __print(*args, **kargs):
-	if not supress_output:
-		print(*args, **kargs)
-
-def eprint(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
 
 supress_output = False

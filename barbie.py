@@ -1,140 +1,14 @@
 #!/usr/bin/env python3
 
 import sys
-import subprocess
 import os.path
 import getopt
-import tempfile
 import os
 import susy_interface as susy
+from barbie_test import BarbieTest
 from barbie_exceptions import UnknownLanguageException
 from codes import PythonCode, CCode, CodeLanguage
-
-
-class BarbieTest():
-	def __init__(self, difference_count, first_error_out, first_error_susy, id, path_out, path_susy, path_cmp):
-		self.first_error_out = first_error_out
-		self.first_error_susy = first_error_susy
-		self.difference_count = difference_count
-		self.correct = (difference_count==0)
-		self.id = id
-
-		self.path_out = path_out
-		self.path_susy = path_susy
-		self.path_cmp = path_cmp
-		self.path_folder = os.path.split(path_susy)[0]
-
-
-# Execute the code with the input from the in_file and save the output in the out_dir
-def exe_code(user_code, in_file, out_dir, index, timeout):
-	out = open(os.path.join(out_dir, str(index), in_file.split('.')[0]) + '.out', 'w')
-	ins = open(os.path.join(out_dir, str(index), in_file), 'r')
-	user_code.run(stdin=ins, stdout=out, stderr=out, timeout=timeout)
-	out.close()
-	ins.close()
-
-# Execute the code with all the test files
-def run_tests(exec_file, in_files, out_dir, timeout):
-	size = len(in_files)
-	__print()
-	for i in range(size):
-		__print('Executing test %d of %d' %(i+1, size), end='\r')
-		exe_code(exec_file, in_files[i], out_dir, i+1, timeout)
-	__print()
-
-# Compare the code output with the expected result
-def compare_susy(susy_file, out_file, index):
-	# Open our output and the susy answer
-	susy = open(susy_file)
-	try:
-		test = open(out_file)
-	except FileNotFoundError:
-		folder = os.path.dirname(susy_file)
-		for file in os.listdir(folder):
-			if file.endswith(".out"):
-				out_file = os.path.join(folder, file)
-				break
-		test = open(out_file)
-	path_cmp = susy_file.split('.')[0] + '.cmp'
-	# Let's write a .cmp comparison file
-	with open(path_cmp, 'w') as barbie_out:
-
-		s_lines = susy.readlines()
-		t_lines = test.readlines()
-
-		difference_count = 0
-		first_error_out = None
-		first_error_susy = None
-
-		# Number of lines of each output
-		msg_1 = "Arquivo de resposta: %d Linhas\n" % (len(s_lines))
-		msg_2 = "Arquivo de saida: %d Linhas\n" % (len(t_lines))
-
-		# Write to the file
-		barbie_out.write(msg_1)
-		barbie_out.write(msg_2)
-
-
-		for i in range(min(len(s_lines), len(t_lines))):
-			# If lines are differnt
-			if s_lines[i] != t_lines[i]:
-				# Save difference
-				msg_s = "[%d] susy: %s" % (i, s_lines[i])
-				msg_o = "[%d] out:  %s" % (i, t_lines[i])
-
-				if not first_error_out:
-					first_error_out = msg_o
-					first_error_susy = msg_s
-
-				# Write to file
-				barbie_out.write(msg_s)
-				barbie_out.write(msg_o)
-
-				difference_count+=1
-
-		# Number of different lines encountered
-		difference_count += abs(len(s_lines) - len(t_lines))
-
-		msg_f =  "\nDifference count: %d" % difference_count
-		barbie_out.write(msg_f+'\n')
-
-		if not difference_count:
-			msg_t = "Teste %d: Resultado correto!" % (index)
-		else:
-			msg_t = "Teste %d: Resultado incorreto. Linhas divergentes: %d" % (index, difference_count)
-
-		__print(msg_t,)
-
-
-	susy.close()
-	test.close()
-
-	return BarbieTest(difference_count, first_error_out, first_error_susy, index, out_file, susy_file, path_cmp)
-
-
-def _gcc_output_file(source_code):
-	return os.path.splitext(source_code[0])[0] + '.gcc'
-
-def compile_c(source_code, temp=False, dir='./'):
-
-	temp_exe, exec_file = tempfile.mkstemp(dir=dir, suffix='.out')
-	temp_gcc, gcc_out = tempfile.mkstemp(dir=dir, suffix='.gcc')
-	os.close(temp_exe)
-	os.close(temp_gcc)
-
-	# Compile source codes
-	compilation_args = ["gcc", "-Wall", "-o", exec_file] + source_code
-	with open(gcc_out, 'w') as out:
-		process = subprocess.run(compilation_args, stdout=out, stderr=subprocess.STDOUT)
-
-	try:
-		# Check if the compilation failed, in wich case an Exception is raised
-		process.check_returncode()
-		sucess = True
-	except:
-		sucess = False
-	# Return the path to the executable file
-	return exec_file, gcc_out, sucess
+import log
 
 def get_local_tests(tests_folder):
 	in_files  = []
@@ -155,22 +29,41 @@ def get_local_tests(tests_folder):
 	res_files.sort()
 	return in_files, res_files
 
-def run_and_compare(exec_file, in_files, res_files, tests_dir_name, timeout=2):
+def run_and_compare(user_code, in_files, res_files, tests_dir_name, timeout=2):
 	results = list()
-	# Excute the tests
-	run_tests(exec_file, in_files, tests_dir_name,timeout)
 	# Check the output of each test
-	for arq in res_files:
-		test = os.path.splitext(arq)[0]
-		index  = res_files.index(arq)+1
+	for index in range(1, len(res_files)+1):
+		test_directory = os.path.join(tests_dir_name, str(index))
+
+		susy_file = os.path.join(test_directory, res_files[index-1])
+		input_file = os.path.join(test_directory, in_files[index-1])
+
 		# Compare your output with the expected output got from susy
-		results.append(compare_susy(os.path.join(tests_dir_name, str(index), arq), os.path.join(tests_dir_name, str(index), test) + '.out', index))
+		test = BarbieTest(user_code, susy_file, input_file, test_directory, index)
+		test.run(timeout)
+		results.append(test)
+
+	for test in results:
+		test.compare()
 
 	return results
 
+def get_language_and_compile(files):
+	if 'py' in files:
+		user_code = PythonCode()
+		user_code.source_files = files['py']
+		user_code.exec_file = files['py'][0]
+	elif 'c' in files:
+		user_code = CCode()
+		user_code.source_files = files['c']
+		user_code.compile()
+	else:
+		raise UnknownLanguageException
+	return user_code
+
 def usage():
 	options = []
-	__print("""\
+	log.uprint("""\
 Barbie!
 The Susy Simulator
 
@@ -241,22 +134,10 @@ def main():
 	if _files:
 		# Try to compile the source code
 		try:
-			if 'py' in _files:
-				user_code = PythonCode()
-				user_code.source_files = _files['py']
-				user_code.exec_file = _files['py'][0]
-			elif 'c' in _files:
-				user_code = CCode()
-				user_code.source_files = _files['c']
-				exec_file, gcc_f, sucess = compile_c(user_code.source_files)
-				user_code.exec_file = exec_file
-				assert sucess, "Falha na compilação"
-				__print('Código compilado com sucesso!')
-				to_be_deleted.append(gcc_f)
-				to_be_deleted.append(exec_file)
-			else:
-				raise UnknownLanguageException
-		# If there is no .c file
+			user_code = get_language_and_compile(_files)
+			if type(user_code) is CCode:
+				assert user_code.compilation_sucess, "Falha na compilação"
+				log.uprint('Código compilado com sucesso!')
 		except UnknownLanguageException:
 			eprint('Não foi fornecido código de nenhuma linguagem conhecida')
 			usage()
@@ -265,10 +146,10 @@ def main():
 		except AssertionError as e:
 			# Notificate the user about the problem
 			eprint("Falha na compilação!")
-			eprint("OUTPUT >>>", gcc_f)
+			eprint("OUTPUT >>>", user_code.gcc_file)
 			# Show the compilation output and end the program
-			with open(gcc_f, 'r') as gcc:
-				eprint(gcc.read())
+			with open(user_code.gcc_file, 'r') as gcc:
+				log.eprint(gcc.read())
 			exit(1)
 	elif exec_file:
 		user_code = CodeLanguage();
@@ -305,22 +186,8 @@ def main():
 		run_and_compare(user_code, in_files, res_files, tests_dir_name, timeout)
 	exit()
 
-def __print(*args, **kargs):
-	if not supress_output:
-		print(*args, **kargs)
-
-def eprint(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
-
-def exit(*args, **kwargs):
-	for file in to_be_deleted:
-		os.remove(file)
-	sys.exit(*args, **kwargs)
-
-to_be_deleted = list()
 if __name__=="__main__":
-	supress_output = False
+	log.supress_output = False
 	main()
 else:
-	supress_output = True
-	susy.supress_output = True
+	log.supress_output = True
