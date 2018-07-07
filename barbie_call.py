@@ -1,3 +1,4 @@
+import os
 
 class BarbieCall:
     def __init__(self):
@@ -10,3 +11,5 @@ class BarbieCall:
         self.disciplina = None
         self.turma = None
         self.codigo_lab = None
+
+        self.directory = os.getcwd()

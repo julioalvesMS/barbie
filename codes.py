@@ -4,8 +4,11 @@ import os.path
 import tempfile
 
 class CodeLanguage():
-	source_files = None
-	exec_file = None
+	def __init__(self):
+		self.source_files = None
+		self.exec_file = None
+		self.temporary = False
+		self.directory = os.getcwd()
 
 	# Execute the code with the input from the in_file and save the output in the out_dir
 	def exe_code(self, in_file, out_dir, index, timeout):
@@ -35,9 +38,9 @@ class CCode(CodeLanguage):
 	def run(self, stdin, stdout, stderr, timeout):
 		subprocess.run(self.exec_file, stdin=stdin, stdout=stdout, stderr=stderr, universal_newlines=True, timeout=timeout)
 
-	def compile(self, temp=False, dir='./'):
-		temp_exe, self.exec_file = tempfile.mkstemp(dir=dir, suffix='.out')
-		temp_gcc, self.gcc_file = tempfile.mkstemp(dir=dir, suffix='.gcc')
+	def compile(self):
+		temp_exe, self.exec_file = tempfile.mkstemp(dir=self.directory, suffix='.out')
+		temp_gcc, self.gcc_file = tempfile.mkstemp(dir=self.directory, suffix='.gcc')
 		os.close(temp_exe)
 		os.close(temp_gcc)
 

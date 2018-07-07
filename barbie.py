@@ -49,25 +49,27 @@ def run_and_compare(user_code, in_files, res_files, tests_dir_name, timeout=2):
 
 	return results
 
-def get_language_and_compile(files):
+def get_language_and_compile(files, directory):
 	if 'py' in files:
 		user_code = PythonCode()
 		user_code.source_files = files['py']
 		user_code.exec_file = files['py'][0]
+		user_code.directory = directory
 	elif 'c' in files:
 		user_code = CCode()
 		user_code.source_files = files['c']
+		user_code.directory = directory
 		user_code.compile()
 	else:
 		raise UnknownLanguageException
 	return user_code
 
-def prepare_code(files, executable_file=None):
+def prepare_code(files, executable_file, directory):
 	# If the user got us one, compile the source code
 	if files:
 		# Try to compile the source code
 		try:
-			user_code = get_language_and_compile(files)
+			user_code = get_language_and_compile(files, directory)
 			if type(user_code) is CCode:
 				assert user_code.compilation_sucess, "Falha na compilação"
 				log.uprint('Código compilado com sucesso!')
@@ -87,6 +89,7 @@ def prepare_code(files, executable_file=None):
 	elif executable_file:
 		user_code = CodeLanguage();
 		user_code.exec_file = executable_file
+		user_code.directory = directory
 	return user_code
 
 def usage():
@@ -109,9 +112,9 @@ Opções:
 
 
 def execute(barbie_call):
-	user_code = prepare_code(barbie_call.code_files, barbie_call.executable_file)
+	user_code = prepare_code(barbie_call.code_files, barbie_call.executable_file, barbie_call.directory)
 
-	tests_dir_name = os.path.realpath("testes/")
+	tests_dir_name = os.path.join(barbie_call.directory, "testes/")
 	in_files = None
 	res_files = None
 
@@ -134,8 +137,8 @@ def execute(barbie_call):
 	# If we sucessufuly got all needed files,
 	# we may run all tests and compare our output with the expected
 	if in_files and res_files:
-		run_and_compare(user_code, in_files, res_files, tests_dir_name, barbie_call.timeout)
-	exit()
+		result = run_and_compare(user_code, in_files, res_files, tests_dir_name, barbie_call.timeout)
+	return result
 
 def main():
 
@@ -184,6 +187,7 @@ def main():
 		barbie_call.codigo_lab   = input("Lab:        ")
 
 	execute(barbie_call)
+	exit()
 
 
 if __name__=="__main__":
